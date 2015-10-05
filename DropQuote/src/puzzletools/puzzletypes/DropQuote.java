@@ -123,7 +123,7 @@ public class DropQuote {
 	}
 
 	public static DropQuote create(String quote, int columns) {
-		String[] words = quote.toLowerCase().replaceAll("[^a-z ]", "").split(" ");
+		String[] words = quote.toLowerCase().replaceAll("[^a-z ]", "").replaceAll(" +", " ").split(" ");
 		List<Multiset<Character>> letters = new ArrayList<>();
 		for (int i = 0; i < columns; i++) {
 			letters.add(HashMultiset.create());

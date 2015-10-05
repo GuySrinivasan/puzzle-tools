@@ -33,11 +33,17 @@ public class Runner {
 		// proportionate to the offense.", 20);
 		// DropQuote dropQuote = DropQuote.create("Let the punishment be
 		// proportionate to the offense.", 12);
-		DropQuote dropQuote = new DropQuote.DropQuoteBuilder()
-				.withColumns("ntioi", "cnvhaq", "ieteut", "aooa", "lrntnu", "lsice", "swcey", "hea", "iiiws", "csnitm",
-						"toph", "trdth", "ihdhe", "ssitai", "hntsn", "geigo", "tfv", "hatoea", "beecr", "qyoin", "ugu",
-						"igtsa")
-				.withWordLengths(3, 6, 5, 5, 6, 2, 4, 4, 4, 2, 1, 7, 12, 4, 3, 10, 5, 2, 5, 8, 10).build();
+		DropQuote dropQuote = DropQuote.create(
+				"I have come to believe that the whole world is an enigma, a harmless enigma that is made terrible by our own mad attempt to interpret it as though it had an underlying truth.",
+				15);
+		// DropQuote dropQuote = new DropQuote.DropQuoteBuilder()
+		// .withColumns("ntioi", "cnvhaq", "ieteut", "aooa", "lrntnu", "lsice",
+		// "swcey", "hea", "iiiws", "csnitm",
+		// "toph", "trdth", "ihdhe", "ssitai", "hntsn", "geigo", "tfv",
+		// "hatoea", "beecr", "qyoin", "ugu",
+		// "igtsa")
+		// .withWordLengths(3, 6, 5, 5, 6, 2, 4, 4, 4, 2, 1, 7, 12, 4, 3, 10, 5,
+		// 2, 5, 8, 10).build();
 		// DropQuote dropQuote = new
 		// DropQuote.DropQuoteBuilder().withColumn("oaooot").withColumn("ntwp")
 		// .withColumn("ipoett").withColumn("skihhr").withColumn("neekoe").withColumn("mtefg").withColumn("tpnh")
@@ -80,8 +86,9 @@ public class Runner {
 			}
 		}
 
-		Distribution<Character>[][] trigrammedSolution = applyTrigramProbabilities(freqs, dropQuote, letters, R, C,
-				currentSolution);
+		// Distribution<Character>[][] trigrammedSolution =
+		// applyTrigramProbabilities(freqs, dropQuote, letters, R, C,
+		// currentSolution);
 
 		// now take into account full word probabilities
 		// 1. find each word's "without trigram bias" probability, then
@@ -90,6 +97,17 @@ public class Runner {
 		// 4. normalize
 		// 5. goto 3 and 4 a bunch of times
 
+		Distribution<Character>[][] newSolution = applyWordProbabilities(trigrams, dropQuote, letters, R, C,
+				currentSolution);
+		for (int i = 0; i < 10; i++) {
+			newSolution = applyWordProbabilities(trigrams, dropQuote, letters, R, C, newSolution);
+		}
+
+		chooseAndPrintSolution(dropQuote, R, C, newSolution);
+	}
+
+	private static Distribution<Character>[][] applyWordProbabilities(Trigrams trigrams, DropQuote dropQuote,
+			Set<Character> letters, int R, int C, Distribution<Character>[][] solution) {
 		Map<Integer, Set<String>> allWords = trigrams.readAllWords();
 		List<Integer> wordLengths = dropQuote.getWordLengths();
 		Map<Integer, Map<String, Double>> normalizedWordProbabilities = trigrams.computeNormalizedWordProbabilities();
@@ -101,7 +119,7 @@ public class Runner {
 		for (int r = 0; r < R; r++) {
 			for (int c = 0; c < C; c++) {
 				builders[r][c] = new Runner.Distribution.DistributionBuilder<>(letters);
-				if (trigrammedSolution[r][c].get('$') > 1.0 - 1e-9) {
+				if (solution[r][c].get('$') > 1.0 - 1e-9) {
 					builders[r][c].withIncrement('$', 1.0);
 				}
 			}
@@ -110,15 +128,11 @@ public class Runner {
 		for (int wordIndex = 0; wordIndex < wordLengths.size(); wordIndex++) {
 			int wordLength = wordLengths.get(wordIndex);
 			for (String word : allWords.get(wordLength)) {
-				if (word.equals("$one$")) {
-					int x = 0;
-					x++;
-				}
 				double prob = normalizedWordProbabilities.get(wordLength).get(word);
 				for (int offset = 0; offset < wordLength; offset++) {
 					int r = (startPos + offset) / C;
 					int c = (startPos + offset) % C;
-					prob *= trigrammedSolution[r][c].get(word.charAt(offset + 1));
+					prob *= solution[r][c].get(word.charAt(offset + 1));
 				}
 				for (int offset = 0; offset < wordLength; offset++) {
 					int r = (startPos + offset) / C;
@@ -135,8 +149,7 @@ public class Runner {
 		}
 
 		applyConstraints(dropQuote, R, C, newSolution);
-
-		chooseAndPrintSolution(dropQuote, R, C, newSolution);
+		return newSolution;
 	}
 
 	private static void chooseAndPrintSolution(DropQuote dropQuote, int R, int C,
@@ -153,8 +166,6 @@ public class Runner {
 						System.out.println("Adding choice for column " + c + ": " + choice.elem + " at row "
 								+ choice.index + " with weight " + solution[r][c].get(choice.elem));
 					} else {
-						System.out.println("Not adding choice for column " + c + ": " + elem + " at row " + r
-								+ " with weight " + solution[r][c].get(elem));
 					}
 				}
 			}
@@ -164,7 +175,6 @@ public class Runner {
 			}
 			Multiset<Character> columnLetters = HashMultiset.create(dropQuote.getLetters().get(c));
 			while (!indices.isEmpty()) {
-				System.out.println("column " + c + " indices " + indices);
 				IndexChoice<Character> choice = choices.stream().filter(ch -> indices.contains(ch.index))
 						.sorted((c1, c2) -> -Double.compare(solution[c1.index][column].get(c1.elem),
 								solution[c2.index][column].get(c2.elem)))
@@ -262,8 +272,13 @@ public class Runner {
 			}
 			for (int r = 0; r < R; r++) {
 				for (int c = 0; c < C; c++) {
-					newSolution[r][c].normalize();
+					newSolution[r][c].halfNormalize();
 				}
+			}
+		}
+		for (int r = 0; r < R; r++) {
+			for (int c = 0; c < C; c++) {
+				newSolution[r][c].normalize();
 			}
 		}
 	}
@@ -297,6 +312,18 @@ public class Runner {
 			}
 			for (T elem : dist.keySet()) {
 				dist.put(elem, dist.get(elem) / sum);
+			}
+		}
+
+		public void halfNormalize() {
+			double sum = 0;
+			for (double value : dist.values()) {
+				sum += value;
+			}
+			for (T elem : dist.keySet()) {
+				double oldWeight = dist.get(elem);
+				double prob = oldWeight / sum;
+				dist.put(elem, (2 * oldWeight + prob) / 3.0);
 			}
 		}
 
