@@ -1,5 +1,6 @@
 package puzzletools.killerqueen;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -136,11 +137,13 @@ public class Board {
 	private int destColumn;
 	private int targetRobot;
 	private final Map<Direction, boolean[][]> moveable;
+	private final Set<Long> solutionStates;
 
 	public Board(int destRow, int destColumn, int targetRobot) {
 		this.destRow = destRow;
 		this.destColumn = destColumn;
 		this.targetRobot = targetRobot;
+		this.solutionStates = new HashSet<>();
 		moveable = new HashMap<>();
 		moveable.put(Direction.NORTH, MOVE_N);
 		moveable.put(Direction.SOUTH, MOVE_S);
@@ -197,9 +200,11 @@ public class Board {
 	}
 
 	public boolean isSolution(BoardState state) {
+		boolean isPrecalc = solutionStates.contains(state.getTinyState());
 		boolean rightRow = state.getRobotRow(targetRobot) == destRow;
 		boolean rightColumn = state.getRobotColumn(targetRobot) == destColumn;
-		return rightRow && rightColumn;
+		boolean stillAlive = state.isRobotAlive(targetRobot);
+		return isPrecalc || (rightRow && rightColumn && stillAlive);
 	}
 
 	public Set<BoardState> getSuccessors(BoardState state) {
@@ -216,6 +221,9 @@ public class Board {
 		// move robot in direction as far as it can go, ask state for a new
 		// state with moved robot, evaluate queen movement, ask new state for a
 		// new state with moved queen if necessary, return final state
+		if (!state.isRobotAlive(robot)) {
+			return state;
+		}
 
 		int nextRobotRow = state.getRobotRow(robot);
 		int nextRobotColumn = state.getRobotColumn(robot);
@@ -281,8 +289,10 @@ public class Board {
 			queenRow += direction.getRowDir();
 			queenColumn += direction.getColumnDir();
 			for (int robot = 0; robot < 4; robot++) {
-				if (state.getRobotRow(robot) == queenRow && state.getRobotColumn(robot) == queenColumn) {
-					return robot;
+				if (state.isRobotAlive(robot)) {
+					if (state.getRobotRow(robot) == queenRow && state.getRobotColumn(robot) == queenColumn) {
+						return robot;
+					}
 				}
 			}
 		}
@@ -294,9 +304,25 @@ public class Board {
 		boolean noPiece = state.getQueenRow() != row + direction.getRowDir()
 				|| state.getQueenColumn() != column + direction.getColumnDir();
 		for (int i = 0; i < 4; i++) {
-			noPiece &= state.getRobotRow(i) != row + direction.getRowDir()
-					|| state.getRobotColumn(i) != column + direction.getColumnDir();
+			if (state.isRobotAlive(i)) {
+				noPiece &= state.getRobotRow(i) != row + direction.getRowDir()
+						|| state.getRobotColumn(i) != column + direction.getColumnDir();
+			}
 		}
 		return noWalls && noPiece;
+	}
+
+	public void setSolutionStates(long... solutions) {
+		solutionStates.clear();
+		for (long solution : solutions) {
+			solutionStates.add(solution);
+		}
+	}
+
+	public void setSolutionStates(Collection<Long> solutions) {
+		solutionStates.clear();
+		for (long solution : solutions) {
+			solutionStates.add(solution);
+		}
 	}
 }
